@@ -6,19 +6,40 @@
     <title>Portal Presensi Harian SMKN 1 Pajangan</title>
     <style>
         body { font-family: sans-serif; max-width: 400px; margin: auto; padding: 20px; text-align: center; }
-        video, canvas { width: 100%; max-width: 300px; border-radius: 8px; margin-bottom: 10px; }
+        
+        /* PERBAIKAN 1: Membuat ukuran video kamera responsif & membatasi tinggi agar tombol tidak tergeser ke bawah */
+        video, canvas { 
+            width: 100%; 
+            max-width: 280px; 
+            height: 210px; /* Dikunci tingginya agar hemat ruang di layar */
+            object-fit: cover; 
+            border-radius: 12px; 
+            margin-bottom: 8px; 
+            background-color: #ccc;
+        }
+        
         input, select, button { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; }
         #canvas { display: none; }
         #info-lokasi { font-weight: bold; margin-bottom: 15px; color: blue; }
         .sukses { color: green; font-weight: bold; }
         .gagal { color: red; font-weight: bold; }
+
+        /* Style khusus untuk tombol balik kamera */
+        .btn-switch {
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            color: #333;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 12px;
+        }
     </style>
 </head>
 <body>
  
     <h2>Presensi Harian Sekolah</h2>
  
-    <!-- TAMBAHAN BARU: Menu Pilihan Kelas -->
     <select id="kelas" required>
         <option value="">-- Pilih Kelas --</option>
         <option value="X DPIB A">X DPIB A</option>
@@ -27,6 +48,15 @@
         <option value="XI DPIB B">XI DPIB B</option>
         <option value="XII DPIB A">XII DPIB A</option>
         <option value="XII DPIB B">XII DPIB B</option>
+        <option value="X RPL A">X RPL A</option>
+        <option value="X RPL B">X RPL B</option>
+        <option value="XI RPL A">XI RPL A</option>
+        <option value="XI RPL B">XI RPL B</option>
+        <option value="XII RPL A">XII RPL A</option>
+        <option value="XII RPL B">XII RPL B</option>
+        <option value="X K3R">X K3R</option>
+        <option value="XI K3R">XI K3R</option>
+        <option value="XII K3R">XII K3R</option>
     </select>
 
     <input type="number" id="nis" placeholder="Masukkan NIS" required>
@@ -42,6 +72,8 @@
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
  
+    <button type="button" class="btn-switch" id="btn-ganti-kamera">🔄 Balik Kamera (Depan/Belakang)</button>
+
     <div id="info-lokasi">Mencari lokasi GPS...</div>
  
     <button id="btn-foto" disabled>Ambil Foto & Kirim</button>
@@ -53,29 +85,27 @@
         const ctx = canvas.getContext('2d');
         const infoLokasi = document.getElementById('info-lokasi');
         const btnFoto = document.getElementById('btn-foto');
+        const btnGantiKamera = document.getElementById('btn-ganti-kamera');
         const statusPesan = document.getElementById('status-pesan');
         const statusSelect = document.getElementById('status');
         
         let kordinatSaatIni = null;
         let isDiDalamRadius = false;
+        
+        // Aturan posisi default: "user" = depan, "environment" = belakang
+        let posisiKamera = "user"; 
+        let streamLokal = null;
 
-        // =========================================================================
-        // PENGATURAN UTAMA SEKOLAH
-        // =========================================================================
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw5NaVnpunYFbVA7OKsI36BlANVOUXGkZH6uFZXy_awu0ViwpdTVTjgbQQ73YPBKREQ/exec";
-        // Jarak toleransi maksimal dari titik pusat (dalam satuan meter)
         const RADIUS_MAKSIMAL = 100; 
 
-        // KAMPUS 1 (Silakan sesuaikan koordinatnya)
         const LAT_SEKOLAH_1 = -7.8597175;  
         const LON_SEKOLAH_1 = 110.2657585; 
         const NAMA_KAMPUS_1 = "Kampus Utama";
 
-        // KAMPUS 2 (Silakan sesuaikan koordinatnya)
-        const LAT_SEKOLAH_2 = -7.8938703;  // Ganti dengan Latitude Kampus 2 Anda
-        const LON_SEKOLAH_2 = 110.2849513; // Ganti dengan Longitude Kampus 2 Anda
+        const LAT_SEKOLAH_2 = -7.8938703;  
+        const LON_SEKOLAH_2 = 110.2849513; 
         const NAMA_KAMPUS_2 = "Kampus 2";
-        // =========================================================================
 
         // Fungsi Hitung Jarak (Haversine Formula)
         function hitungJarak(lat1, lon1, lat2, lon2) {
@@ -105,12 +135,33 @@
 
         statusSelect.addEventListener('change', validasiTombol);
  
-        // Aktifkan Kamera
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
-            .then(stream => { video.srcObject = stream; })
-            .catch(err => { infoLokasi.innerHTML = "<span class='gagal'>Kamera tidak diizinkan!</span>"; });
+        // PERBAIKAN 3: Fungsi Dinamis untuk Menyalakan Kamera Depan/Belakang
+        function jalankanKamera() {
+            // Matikan kamera yang aktif sebelumnya agar tidak bentrok
+            if (streamLokal) {
+                streamLokal.getTracks().forEach(track => track.stop());
+            }
+
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: posisiKamera } })
+                .then(stream => { 
+                    streamLokal = stream;
+                    video.srcObject = stream; 
+                })
+                .catch(err => { 
+                    infoLokasi.innerHTML = "<span class='gagal'>Gagal memuat lensa kamera!</span>"; 
+                });
+        }
+
+        // Jalankan aksi tombol ganti kamera saat diklik siswa
+        btnGantiKamera.addEventListener('click', () => {
+            posisiKamera = (posisiKamera === "user") ? "environment" : "user";
+            jalankanKamera();
+        });
+
+        // Nyalakan kamera pertama kali saat web terbuka
+        jalankanKamera();
  
-        // Kunci Lokasi & Validasi Jarak Geofencing (2 Lokasi)
+        // Kunci Lokasi & Validasi Jarak Geofencing
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(
                 (position) => {
@@ -118,11 +169,9 @@
                     const lonSiswa = position.coords.longitude;
                     kordinatSaatIni = `${latSiswa}, ${lonSiswa}`;
                     
-                    // Hitung jarak siswa ke masing-masing kampus
                     const jarakKeKampus1 = hitungJarak(latSiswa, lonSiswa, LAT_SEKOLAH_1, LON_SEKOLAH_1);
                     const jarakKeKampus2 = hitungJarak(latSiswa, lonSiswa, LAT_SEKOLAH_2, LON_SEKOLAH_2);
                     
-                    // Cek lokasi mana yang cocok
                     if (jarakKeKampus1 <= RADIUS_MAKSIMAL) {
                         isDiDalamRadius = true;
                         if (statusSelect.value === "Datang" || statusSelect.value === "Pulang") {
@@ -136,8 +185,7 @@
                     } else {
                         isDiDalamRadius = false;
                         if (statusSelect.value === "Datang" || statusSelect.value === "Pulang") {
-                            // Menampilkan info jarak terdekat agar siswa tahu seberapa jauh mereka di luar area
-                            const jarakTerdekat = Math.min(jarakKeKampus1, jarakKeKampus2);
+                            const jarakTerdekat = Math.min(jarakKeKampus1, jarakKeCampus2);
                             infoLokasi.innerHTML = `<span class='gagal'>Anda di luar area sekolah (Jarak terdekat: ${Math.round(jarakTerdekat)}m). Presensi dikunci!</span>`;
                         }
                     }
@@ -177,7 +225,7 @@
             const fotoBase64 = canvas.toDataURL('image/jpeg', 0.8);
  
             const payload = {
-                kelas: kelas, // Menyertakan data kelas ke payload kiriman
+                kelas: kelas,
                 nis: nis,
                 nama: nama,
                 status: status,
