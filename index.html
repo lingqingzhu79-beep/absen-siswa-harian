@@ -242,15 +242,15 @@
             .then(data => {
                 if (data.result === "success") {
                     statusPesan.innerHTML = "<span class='sukses'>Presensi Berhasil Diterima!</span>";
+                    
+                    // SISIPKAN BARIS INI: Memberikan sinyal instan ke Android untuk menutup aplikasi
+                    console.log("sukses_absen_tutup");
+                    
                 } else {
                     statusPesan.innerHTML = `<span class='gagal'>${data.message}</span>`;
                 }
                 btnFoto.disabled = false;
             })
-            .catch(error => {
-                statusPesan.innerHTML = "<span class='gagal'>Terjadi kesalahan koneksi internet.</span>";
-                btnFoto.disabled = false;
-            });
         });
     </script>
 </body>
