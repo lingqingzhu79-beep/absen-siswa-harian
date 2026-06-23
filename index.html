@@ -197,7 +197,11 @@
                     isDiDalamRadius = false;
                     validasiTombol();
                 },
-                { enableHighAccuracy: true }
+                { 
+    enableHighAccuracy: true, 
+    timeout: 10000,      // ⏱️ Batasi pencarian maksimal 10 detik. Jika lewat, paksa pakai lokasi yang ada.
+    maximumAge: 30000    // 💾 Izinkan pakai data lokasi 30 detik terakhir yang tersimpan di HP agar instan.
+}
             );
         }
  
