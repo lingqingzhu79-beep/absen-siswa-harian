@@ -162,49 +162,73 @@
         jalankanKamera();
  
         // Kunci Lokasi & Validasi Jarak Geofencing
+        // ==================== KODE PELACAK LOKASI YANG SUDAH DIOPTIMALKAN ====================
         if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(
-                (position) => {
-                    const latSiswa = position.coords.latitude;
-                    const lonSiswa = position.coords.longitude;
-                    kordinatSaatIni = `${latSiswa}, ${lonSiswa}`;
-                    
-                    const jarakKeKampus1 = hitungJarak(latSiswa, lonSiswa, LAT_SEKOLAH_1, LON_SEKOLAH_1);
-                    const jarakKeKampus2 = hitungJarak(latSiswa, lonSiswa, LAT_SEKOLAH_2, LON_SEKOLAH_2);
-                    
-                    if (jarakKeKampus1 <= RADIUS_MAKSIMAL) {
-                        isDiDalamRadius = true;
-                        if (statusSelect.value === "Datang" || statusSelect.value === "Pulang") {
-                            infoLokasi.innerHTML = `<span class='sukses'>Lokasi Cocok! Terdeteksi di ${NAMA_KAMPUS_1} (Jarak: ${Math.round(jarakKeKampus1)}m).</span>`;
-                        }
-                    } else if (jarakKeKampus2 <= RADIUS_MAKSIMAL) {
-                        isDiDalamRadius = true;
-                        if (statusSelect.value === "Datang" || statusSelect.value === "Pulang") {
-                            infoLokasi.innerHTML = `<span class='sukses'>Lokasi Cocok! Terdeteksi di ${NAMA_KAMPUS_2} (Jarak: ${Math.round(jarakKeKampus2)}m).</span>`;
-                        }
-                    } else {
-                        isDiDalamRadius = false;
-                        if (statusSelect.value === "Datang" || statusSelect.value === "Pulang") {
-                            const jarakTerdekat = Math.min(jarakKeKampus1, jarakKeCampus2);
-                            infoLokasi.innerHTML = `<span class='gagal'>Anda di luar area sekolah (Jarak terdekat: ${Math.round(jarakTerdekat)}m). Presensi dikunci!</span>`;
-                        }
-                    }
-                    
-                    validasiTombol();
-                },
-                (error) => { 
-                    infoLokasi.innerHTML = "<span class='gagal'>Gagal mendapatkan lokasi. Aktifkan GPS HP!</span>";
-                    isDiDalamRadius = false;
-                    validasiTombol();
-                },
-                { 
-    enableHighAccuracy: true, 
-    timeout: 10000,      // ⏱️ Batasi pencarian maksimal 10 detik. Jika lewat, paksa pakai lokasi yang ada.
-    maximumAge: 60000    // 💾 Izinkan pakai data lokasi 30 detik terakhir yang tersimpan di HP agar instan.
-}
-            );
+            // Menggunakan getCurrentPosition terlebih dahulu agar koordinat langsung terkunci secara instan saat web dibuka
+            navigator.geolocation.getCurrentPosition(prosesLokasiSiswa, tanganiErrorLokasi, {
+                enableHighAccuracy: false, // Set ke false agar memanfaatkan menara seluler/WiFi jika GPS satelit terhalang atap gedung
+                timeout: 10000,            // Batasi waktu tunggu maksimal 10 detik
+                maximumAge: 60000          // Gunakan cache lokasi terakhir agar langsung instan terbaca
+            });
+
+            // Tetap pantau perubahan posisi secara berkala dengan setelan yang longgar
+            navigator.geolocation.watchPosition(prosesLokasiSiswa, tanganiErrorLokasi, {
+                enableHighAccuracy: false,
+                timeout: 15000,
+                maximumAge: 60000
+            });
+        } else {
+            infoLokasi.innerHTML = "<span class='gagal'>Browser HP Anda tidak mendukung fitur lokasi GPS!</span>";
         }
- 
+
+        // Fungsi Pembaca Posisi Koordidat Siswa
+        function prosesLokasiSiswa(position) {
+            const latSiswa = position.coords.latitude;
+            const lonSiswa = position.coords.longitude;
+            kordinatSaatIni = `${latSiswa}, ${lonSiswa}`;
+            
+            const jarakKeKampus1 = hitungJarak(latSiswa, lonSiswa, LAT_SEKOLAH_1, LON_SEKOLAH_1);
+            const jarakKeKampus2 = hitungJarak(latSiswa, lonSiswa, LAT_SEKOLAH_2, LON_SEKOLAH_2);
+            
+            if (jarakKeKampus1 <= RADIUS_MAKSIMAL) {
+                isDiDalamRadius = true;
+                if (statusSelect.value === "Datang" || statusSelect.value === "Pulang") {
+                    infoLokasi.innerHTML = `<span class='sukses'>📌 Lokasi Cocok! Terdeteksi di ${NAMA_KAMPUS_1} (Jarak: ${Math.round(jarakKeKampus1)}m).</span>`;
+                }
+            } else if (jarakKeKampus2 <= RADIUS_MAKSIMAL) {
+                isDiDalamRadius = true;
+                if (statusSelect.value === "Datang" || statusSelect.value === "Pulang") {
+                    infoLokasi.innerHTML = `<span class='sukses'>📌 Lokasi Cocok! Terdeteksi di ${NAMA_KAMPUS_2} (Jarak: ${Math.round(jarakKeKampus2)}m).</span>`;
+                }
+            } else {
+                isDiDalamRadius = false;
+                if (statusSelect.value === "Datang" || statusSelect.value === "Pulang") {
+                    const jarakTerdekat = Math.min(jarakKeKampus1, jarakKeKampus2);
+                    infoLokasi.innerHTML = `<span class='gagal'>❌ Di luar area sekolah (Jarak: ${Math.round(jarakTerdekat)}m). Presensi dikunci!</span>`;
+                }
+            }
+            validasiTombol();
+        }
+
+        // Fungsi Penanganan Error yang Edukatif (Siswa tahu apa yang harus dilakukan)
+        function tanganiErrorLokasi(error) {
+            isDiDalamRadius = false;
+            validasiTombol();
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    infoLokasi.innerHTML = "<span class='gagal'>⚠️ Izin GPS Ditolak! Klik ikon gembok di kolom alamat browser atas, lalu pilih 'Izinkan Lokasi'.</span>";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    infoLokasi.innerHTML = "<span class='gagal'>📡 Sinyal GPS Lemah! Harap keluar ruangan atau dekati jendela kelas.</span>";
+                    break;
+                case error.TIMEOUT:
+                    infoLokasi.innerHTML = "<span class='gagal'>⏱️ Waktu pencarian habis. Sinyal tidak stabil, silakan segarkan halaman (Refresh).</span>";
+                    break;
+                default:
+                    infoLokasi.innerHTML = "<span class='gagal'>❌ Gagal mendapatkan lokasi. Pastikan GPS HP Anda aktif!</span>";
+                    break;
+            }
+        }
         // Kirim Data
         btnFoto.addEventListener('click', () => {
             const kelas = document.getElementById('kelas').value;
