@@ -181,8 +181,23 @@
             infoLokasi.innerHTML = "<span class='gagal'>Browser HP Anda tidak mendukung fitur lokasi GPS!</span>";
         }
 
-        // Fungsi Pembaca Posisi Koordidat Siswa
+          // ==================== KODE AMAN: DETEKSI & BLOKIR FAKE GPS ====================
         function prosesLokasiSiswa(position) {
+            // 🚨 CEK PERTAMA: Apakah siswa menggunakan aplikasi Fake GPS?
+            // Kita periksa properti 'isMocked' atau 'mocked' bawaan sensor Android
+            const isPalsu = position.mocked || 
+                            (position.coords && position.coords.isMocked) || 
+                            (position.raw && position.raw.isMocked);
+
+            if (isPalsu) {
+                isDiDalamRadius = false;
+                validasiTombol();
+                infoLokasi.innerHTML = "<span class='gagal'>🚨 DETEKSI KECURANGAN: Anda menggunakan aplikasi FAKE GPS! Matikan aplikasi tersebut untuk bisa absen.</span>";
+                alert("Hayo... dilarang bohong! Matikan Fake GPS Anda sekarang.");
+                return; // Hentikan proses, siswa tidak bisa pencet tombol kirim
+            }
+
+            // Jika lolos (Lokasi Asli), baru hitung jarak seperti biasa
             const latSiswa = position.coords.latitude;
             const lonSiswa = position.coords.longitude;
             kordinatSaatIni = `${latSiswa}, ${lonSiswa}`;
