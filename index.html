@@ -166,7 +166,7 @@
         if (navigator.geolocation) {
             // Menggunakan getCurrentPosition terlebih dahulu agar koordinat langsung terkunci secara instan saat web dibuka
             navigator.geolocation.getCurrentPosition(prosesLokasiSiswa, tanganiErrorLokasi, {
-                enableHighAccuracy: false, // Set ke false agar memanfaatkan menara seluler/WiFi jika GPS satelit terhalang atap gedung
+                enableHighAccuracy: true, // Set ke false agar memanfaatkan menara seluler/WiFi jika GPS satelit terhalang atap gedung
                 timeout: 5000,            // Batasi waktu tunggu maksimal 10 detik
                 maximumAge: 0          // Gunakan cache lokasi terakhir agar langsung instan terbaca
             });
