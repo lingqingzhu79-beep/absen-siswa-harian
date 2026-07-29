@@ -64,6 +64,7 @@
     
     <select id="status">
         <option value="Datang">Datang</option>
+        <option value="Hadir">Hadir (Terkendala Lokasi)</option> <!-- MENU BARU DITAMBAHKAN -->
         <option value="Pulang">Pulang</option>
         <option value="Sakit">Sakit</option>
         <option value="Izin">Izin</option>
@@ -121,8 +122,9 @@
         // Fungsi Atur Validasi Tombol Berdasarkan Status Absen
         function validasiTombol() {
             const statusSaatIni = statusSelect.value;
-            if (statusSaatIni === "Sakit" || statusSaatIni === "Izin") {
-                infoLokasi.innerHTML = `<span class='sukses'>Mode ${statusSaatIni}: Lokasi luar sekolah diizinkan.</span>`;
+            // UPDATE: "Hadir" dimasukkan ke dalam kondisi yang membypass aturan radius
+            if (statusSaatIni === "Sakit" || statusSaatIni === "Izin" || statusSaatIni === "Hadir") {
+                infoLokasi.innerHTML = `<span class='sukses'>Mode ${statusSaatIni}: Perekaman lokasi & foto diizinkan tanpa batas jarak.</span>`;
                 btnFoto.disabled = false;
             } else {
                 if (isDiDalamRadius) {
@@ -254,6 +256,7 @@
             if (!kelas) { alert("Silakan pilih Kelas terlebih dahulu!"); return; }
             if (!nis || !nama) { alert("NIS dan Nama harus diisi!"); return; }
             
+            // Aturan penolakan submit hanya berlaku untuk "Datang" dan "Pulang"
             if ((status === "Datang" || status === "Pulang") && !isDiDalamRadius) { 
                 alert("Anda berada di luar jangkauan sekolah!"); 
                 return; 
