@@ -142,7 +142,6 @@
             const tglHariIni = dapatkanTanggalHariIni();
             let dataAbsen = JSON.parse(localStorage.getItem('data_absen_smkn1')) || {};
 
-            // Jika hari berganti (besoknya), reset kunci otomatis
             if (dataAbsen.tanggal !== tglHariIni) {
                 dataAbsen = { tanggal: tglHariIni, sudahMasuk: false, sudahPulang: false };
                 localStorage.setItem('data_absen_smkn1', JSON.stringify(dataAbsen));
@@ -153,19 +152,17 @@
             const pesanKunci = document.getElementById('pesan-kunci');
 
             if (dataAbsen.sudahPulang) {
-                // Skenario 1: Sudah absen Pulang / Sakit / Izin -> Kunci TOTAL
                 formContainer.style.display = "none";
                 layarKunci.style.display = "block";
                 pesanKunci.innerHTML = "Anda sudah menyelesaikan presensi untuk hari ini. Aplikasi terkunci dan akan terbuka kembali besok pagi.";
             } else if (dataAbsen.sudahMasuk) {
-                // Skenario 2: Sudah absen Datang -> Hanya buka menu Pulang
                 for (let i = 0; i < statusSelect.options.length; i++) {
                     if (statusSelect.options[i].value !== "Pulang") {
-                        statusSelect.options[i].disabled = true; // Matikan Datang, Sakit, Izin dll
+                        statusSelect.options[i].disabled = true; 
                     }
                 }
-                statusSelect.value = "Pulang"; // Paksa pindah ke Pulang
-                statusSelect.dispatchEvent(new Event('change')); // Jalankan ulang validasi jarak
+                statusSelect.value = "Pulang"; 
+                statusSelect.dispatchEvent(new Event('change')); 
                 
                 layarKunci.style.display = "block";
                 layarKunci.style.borderColor = "blue";
@@ -181,13 +178,13 @@
             if (pin === PIN_GURU) {
                 localStorage.removeItem('data_absen_smkn1');
                 alert("Berhasil! Aplikasi telah direset untuk hari ini.");
-                window.location.reload(); // Muat ulang halaman
+                window.location.reload(); 
             } else if (pin !== null) {
                 alert("PIN Salah! Anda tidak berhak melakukan ini.");
             }
         }
 
-        // ================= KODE LOKASI DAN KAMERA (SAMA SEPERTI SEBELUMNYA) =================
+        // ================= KODE LOKASI DAN KAMERA =================
         function hitungJarak(lat1, lon1, lat2, lon2) {
             const R = 6371000; 
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -281,8 +278,38 @@
             canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const fotoBase64 = canvas.toDataURL('image/jpeg', 0.8);
+
+            // =======================================================================
+            // FITUR BARU: PERHITUNGAN KETERLAMBATAN LANGSUNG DARI HP SISWA
+            // =======================================================================
+            const jamMasuk = new Date();
+            jamMasuk.setHours(7, 0, 0, 0); // BATAS JAM MASUK PUKUL 07:00 (Bisa diganti)
+            const waktuSekarang = new Date();
+            
+            // Hitung selisih menit (jika hasilnya positif berarti telat)
+            const selisihMenit = Math.floor((waktuSekarang - jamMasuk) / 60000);
+            
+            let teksKeterangan = "-";
+            
+            if (status === "Datang") {
+                teksKeterangan = (selisihMenit > 0) ? `Terlambat: ${selisihMenit} menit` : "Tepat Waktu";
+            } else if (status === "Hadir") {
+                teksKeterangan = (selisihMenit > 0) ? `Terlambat: ${selisihMenit} menit (Kendala GPS)` : "Tepat Waktu (Kendala GPS)";
+            } else if (status === "Izin" || status === "Sakit") {
+                teksKeterangan = `Laporan Luar Sekolah (${status})`;
+            }
+            // =======================================================================
  
-            const payload = { kelas, nis, nama, status, lokasi: kordinatSaatIni, foto: fotoBase64 };
+            // Tambahkan "keterangan: teksKeterangan" ke dalam payload pengiriman
+            const payload = { 
+                kelas: kelas, 
+                nis: nis, 
+                nama: nama, 
+                status: status, 
+                lokasi: kordinatSaatIni, 
+                foto: fotoBase64,
+                keterangan: teksKeterangan 
+            };
  
             fetch(SCRIPT_URL, {
                 method: 'POST',
@@ -294,20 +321,15 @@
                 if (data.result === "success") {
                     statusPesan.innerHTML = "<span class='sukses'>Presensi Berhasil Diterima!</span>";
                     
-                    // SIMPAN STATUS KE LOCALSTORAGE
                     let dataAbsen = JSON.parse(localStorage.getItem('data_absen_smkn1'));
                     if (status === "Datang" || status === "Hadir") {
                         dataAbsen.sudahMasuk = true;
                     } else if (status === "Pulang" || status === "Sakit" || status === "Izin") {
-                        // Jika pulang/sakit/izin, kunci total untuk hari tersebut
                         dataAbsen.sudahPulang = true; 
                     }
                     localStorage.setItem('data_absen_smkn1', JSON.stringify(dataAbsen));
 
-                    // Memanggil fungsi tutup aplikasi jika ini berjalan di WebView Android
                     console.log("sukses_absen_tutup");
-
-                    // Panggil ulang pengecekan tampilan UI agar otomatis ganti ke halaman terkunci
                     setTimeout(cekKunciAplikasi, 1500); 
                     
                 } else {
@@ -320,9 +342,7 @@
             });
         });
 
-        // ================= JALANKAN PENGECEKAN KUNCI SAAT WEB PERTAMA DIBUKA =================
         cekKunciAplikasi();
-
     </script>
 </body>
 </html>
